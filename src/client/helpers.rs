@@ -5,6 +5,7 @@ use anchor_client::{solana_sdk::{
     system_program,
 },
 Client, Cluster, ClientError};
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use serde::{Serialize, Deserialize};
@@ -18,6 +19,8 @@ pub enum Currency {
     Usd,
     #[serde(rename = "EUR")]
     Eur,
+    #[serde(rename = "BONK")]
+    BONK,
 }
 
 pub async fn initialize_asset(
@@ -27,10 +30,9 @@ pub async fn initialize_asset(
     name: String
 ) -> std::result::Result<Signature, ClientError> {
     
-    let authority = Keypair::from_base58_string("43xQCVeSAFPtDjEwyTQCirhDfybneT9p4A8HBzX3VBUonkqwi9VPUkgiS1ViZLDbhYBRRrmS6byt1EtoBMcnBESu");
+    let authority = crate::client::constants::get_payer();
     
     let (asset_pda, _bump) = Pubkey::find_program_address(&[b"OMNI".as_ref(), assetId.as_ref()], &program.id());
-    println!("assetpda {}", asset_pda);
 
     let tx = program
         .request()
@@ -56,7 +58,7 @@ pub async fn initialize_asset(
 
 pub async fn update_price(program: &Program<Rc<Keypair>>, asset_pda: Pubkey, new_price: f64,) -> std::result::Result<Signature, ClientError> {
 
- let authority = Keypair::from_base58_string("43xQCVeSAFPtDjEwyTQCirhDfybneT9p4A8HBzX3VBUonkqwi9VPUkgiS1ViZLDbhYBRRrmS6byt1EtoBMcnBESu");
+ let authority = crate::client::constants::get_payer();
   let tx =  program
     .request()
     .accounts(omni_oracle::accounts::UpdatePrice {
@@ -88,4 +90,15 @@ pub async fn initialize_asset_call(metadata: String, name: String) -> Result<Sig
     let tx = initialize_asset(&program, asset_id.pubkey(), metadata, name).await;
 
     tx
+}
+
+pub fn get_assets_map() -> HashMap<String, Pubkey> {
+    let mut assets_map = HashMap::new();
+    
+    // Add your assets and their corresponding public keys
+    assets_map.insert("Coca-Cola".to_string(), "9jcPQz32ZnzH3x861wXVnRPKv4wWqBJTo7XYPzFf8FUt".parse().unwrap());
+    assets_map.insert("Asset2".to_string(), "Asset2PublicKey".parse().unwrap());
+    assets_map.insert("Asset3".to_string(), "Asset3PublicKey".parse().unwrap());
+
+    assets_map
 }

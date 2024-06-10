@@ -47,7 +47,7 @@ pub fn build_json(value: f64) -> AssetData {
 }
 
 
-pub async fn get_dynamic_json(data: web::Data<AppState>) -> impl Responder {
+pub async fn get_dynamic_json(data: web::Data<AppState>) -> HttpResponse {
     let value_guard = data.value.lock().unwrap();
     let response_data = build_json(*value_guard);
     HttpResponse::Ok().json(response_data)
@@ -62,6 +62,7 @@ pub async fn update_price(value: f64) -> Result<Signature, ClientError> {
         Err(e) => return Err(e),
     };
 
+    //let id = crate::client::helpers::get_assets_map().get("Coca-Cola");
 
     let asset_id = Pubkey::from_str("9jcPQz32ZnzH3x861wXVnRPKv4wWqBJTo7XYPzFf8FUt").expect("Invalid bs58 string");
 
@@ -79,39 +80,43 @@ pub async fn update_price(value: f64) -> Result<Signature, ClientError> {
 
 
 pub async fn update_price_loop(data: web::Data<AppState>) -> Result<Signature, ClientError> {
-    loop {
-        let lower_bound = 1.29;
-        let upper_bound = 1.32;
-        let value = generate_random_number(lower_bound, upper_bound).round_up(4);
+    let lower_bound = 1.29;
+    let upper_bound = 1.32;
+    let value = generate_random_number(lower_bound, upper_bound).round_up(4);
 
-        let rpc = RpcClient::new("https://api.devnet.solana.com");
+    let rpc = RpcClient::new("https://api.devnet.solana.com");
 
-        {
-            let mut value_guard = data.value.lock().unwrap();
-            *value_guard = value;
-        }
+    {
+        let mut value_guard = data.value.lock().unwrap();
+        *value_guard = value;
+    }
 
+    let balance = rpc
+        .get_balance(&crate::client::constants::get_payer_pubkey())
+        .unwrap();
 
-        let balance = rpc
-          .get_balance(&crate::client::constants::get_payer_pubkey())
-           .unwrap();
+    let balance_in_sol: f64 = balance as f64 / LAMPORTS_PER_SOL as f64;
 
-        let balance_in_sol: f64 = balance as f64 / LAMPORTS_PER_SOL as f64;
-    
-        match update_price(value).await {
-        Ok(tx) =>  {
-                // Fetch balance after update_price within the success block
-                let balance_after = rpc
-                    .get_balance(&crate::client::constants::get_payer_pubkey())
-                    .unwrap();
-                let balance_in_sol_after: f64 = balance_after as f64 / LAMPORTS_PER_SOL as f64;
+    match update_price(value).await {
+        Ok(tx) => {
+            // Fetch balance after update_price within the success block
+            let balance_after = rpc
+                .get_balance(&crate::client::constants::get_payer_pubkey())
+                .unwrap();
+            let balance_in_sol_after: f64 = balance_after as f64 / LAMPORTS_PER_SOL as f64;
 
-                let cost = balance_in_sol - balance_in_sol_after;
-                
-                println!("COST: {:.10}", cost);
-            },
-            Err(e) => error!("Failed to update price: {:?}", e),
-        }
-        sleep(Duration::from_secs(1)).await;
+            let cost = balance_in_sol - balance_in_sol_after;
+
+            println!("COST: {:.10}", cost);
+
+            // Return the transaction signature
+            return Ok(tx);
+        },
+        Err(e) => {
+            error!("Failed to update price: {:?}", e);
+
+            // Return the error
+            return Err(e);
+        },
     }
 }

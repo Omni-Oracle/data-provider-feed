@@ -7,11 +7,14 @@ mod providers;
 mod client;
 mod server;
 
-use providers::cocacola_eu::AppState;
 
 use crate::providers::{
     cocacola_eu::{update_price_loop as cocacola_feed, AppState as CocaColaAppState},
-    macdonald_us::{update_price_loop as macdonald_feed, AppState as MacdonaldAppState}
+    macdonald_us::{update_price_loop as macdonald_feed, AppState as MacdonaldAppState},
+    nike_dunk::{update_price_loop as nike_dunk_feed, AppState as NikeDunkAppState},
+    nrth_face_jacket::{AppState as NorthFaceState},
+    playstation_eu::{AppState as PlaystationState},
+    redbull_eu::{AppState as RedbullState}
 };
 
 
@@ -21,25 +24,11 @@ async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt::init();
 
 
-    let shared_state = web::Data::new(AppState {
+    let cocacola_state = web::Data::new(CocaColaAppState {
         value: Arc::new(Mutex::new(0.0)),
     });
 
-    let server_state = shared_state.clone();
-    let server_thread = std::thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        if let Err(e) = sys.block_on(server::run_server(server_state)) {
-            error!("Failed to start server: {:?}", e);
-        }
-    });
-
-    // Your existing async code here
-    // match providers::cocacola_eu::update_price_loop(shared_state).await {
-    //     Ok(s) => info!("{:?}", s),
-    //     Err(e) => error!("{:?}", e),
-    // }
-
-    let cocacola_state = web::Data::new(CocaColaAppState {
+    let nike_dunk_state = web::Data::new(NikeDunkAppState {
         value: Arc::new(Mutex::new(0.0)),
     });
 
@@ -47,9 +36,46 @@ async fn main() -> std::io::Result<()> {
         value: Arc::new(Mutex::new(0.0)),
     });
 
-    crate::providers::omni_provider::omni_feed(cocacola_state, macdonald_state).await;
+    let nrth_face_state = web::Data::new(NorthFaceState {
+        value: Arc::new(Mutex::new(0.0)),
+    });
 
-    // Wait for the server thread to finish (it won't, as HttpServer runs indefinitely)
+    let playstation_state = web::Data::new(PlaystationState {
+        value: Arc::new(Mutex::new(0.0)),
+    });
+
+    let redbull_state = web::Data::new(RedbullState {
+        value: Arc::new(Mutex::new(0.0)),
+    });
+
+
+    let cocacola_state_clone = cocacola_state.clone();
+    let nike_dunk_state_clone = nike_dunk_state.clone();
+    let macdonald_state_clone = macdonald_state.clone();
+    let nrth_face_state_clone = nrth_face_state.clone();
+    let playstation_state_clone = playstation_state.clone();
+    let redbull_state_clone = redbull_state.clone();
+
+
+
+    // let server_state = shared_state.clone();
+    let server_thread = std::thread::spawn(move || {
+        let sys = actix_rt::System::new();
+        if let Err(e) = sys.block_on(server::run_server(
+            cocacola_state_clone, 
+            macdonald_state_clone, 
+            nrth_face_state_clone, 
+            nike_dunk_state_clone, 
+            playstation_state_clone,
+            redbull_state_clone
+        )) {
+            error!("Failed to start server: {:?}", e);
+        }
+    });
+
+     crate::providers::omni_provider::omni_feed(cocacola_state, macdonald_state, nike_dunk_state, nrth_face_state, playstation_state, redbull_state).await;
+
+    // Wait for the server thread to finish // HttpServer runs indefinitely
     if let Err(e) = server_thread.join() {
         error!("Server thread encountered an error: {:?}", e);
     }

@@ -16,7 +16,7 @@ pub fn get_payer_pubkey() -> Pubkey {
 }
 
 pub fn get_client(payer: Keypair) -> Client<Rc<Keypair>> {
-    Client::new(Cluster::Devnet, Rc::new(payer))
+    Client::new_with_options(Cluster::Devnet, Rc::new(payer), CommitmentConfig::confirmed())
 }
 
 pub fn get_asset_id() -> Keypair {

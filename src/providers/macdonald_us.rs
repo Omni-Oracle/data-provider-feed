@@ -36,7 +36,7 @@ pub fn generate_random_number(lower_bound: f64, upper_bound: f64) -> f64 {
 
 pub fn build_json(value: f64) -> AssetData {
     AssetData {
-         name: "Double Quarter Pounder with Cheese Price & Calories".to_string(),
+         name: "MacDonalds: Double Quarter Pounder with Cheese Price & Calories".to_string(),
          region: "US".to_string(),
          image: "https://mcd-menu.com/wp-content/uploads/2024/01/Double-Quarter-Pounder%C2%AE-with-Cheese.webp".to_string(),
          source: "https://mcd-menu.com/double-quarter-pounder-with-cheese/".to_string(),
@@ -45,7 +45,7 @@ pub fn build_json(value: f64) -> AssetData {
          value }
 }
 
-pub async fn get_dynamic_json(data: web::Data<AppState>) -> impl Responder {
+pub async fn get_dynamic_json(data: web::Data<AppState>) -> HttpResponse {
     let value_guard = data.value.lock().unwrap();
     let response_data = build_json(*value_guard);
     HttpResponse::Ok().json(response_data)
@@ -60,7 +60,7 @@ pub async fn update_price(value: f64) -> Result<Signature, ClientError> {
     };
 
 
-    let asset_id = Pubkey::from_str("9jcPQz32ZnzH3x861wXVnRPKv4wWqBJTo7XYPzFf8FUt").expect("Invalid bs58 string");
+    let asset_id = Pubkey::from_str("211DYzA5buoT3WDr3ZcJYdWYYwgT74RECs5wuvjf3SWL").expect("Invalid bs58 string");
 
     match crate::client::helpers::update_price(&program, asset_id, value).await {
         Ok(tx) => {
@@ -76,7 +76,6 @@ pub async fn update_price(value: f64) -> Result<Signature, ClientError> {
 
 
 pub async fn update_price_loop(data: web::Data<AppState>) -> Result<Signature, ClientError> {
-    loop {
         let lower_bound = 9.69;
         let upper_bound = 9.85; 
         let value = generate_random_number(lower_bound, upper_bound).round_up(4);
@@ -96,19 +95,25 @@ pub async fn update_price_loop(data: web::Data<AppState>) -> Result<Signature, C
         let balance_in_sol: f64 = balance as f64 / LAMPORTS_PER_SOL as f64;
     
         match update_price(value).await {
-        Ok(tx) =>  {
+            Ok(tx) => {
                 // Fetch balance after update_price within the success block
                 let balance_after = rpc
                     .get_balance(&crate::client::constants::get_payer_pubkey())
                     .unwrap();
                 let balance_in_sol_after: f64 = balance_after as f64 / LAMPORTS_PER_SOL as f64;
-
+    
                 let cost = balance_in_sol - balance_in_sol_after;
-                
+    
                 println!("COST: {:.10}", cost);
+    
+                // Return the transaction signature
+                return Ok(tx);
             },
-            Err(e) => error!("Failed to update price: {:?}", e),
+            Err(e) => {
+                error!("Failed to update price: {:?}", e);
+    
+                // Return the error
+                return Err(e);
+            },
         }
-        sleep(Duration::from_secs(1)).await;
     }
-}
